@@ -1,24 +1,4 @@
 // TexturedQuad.js (c) 2012 matsuda and kanda
-// Vertex shader program
-var VSHADER_SOURCE =
-  'attribute vec4 a_Position;\n' +
-  'attribute vec2 a_TexCoord;\n' +
-  'varying vec2 v_TexCoord;\n' +
-  'void main() {\n' +
-  '  gl_Position = a_Position;\n' +
-  '  v_TexCoord = a_TexCoord;\n' +
-  '}\n';
-
-// Fragment shader program
-var FSHADER_SOURCE =
-  '#ifdef GL_ES\n' +
-  'precision mediump float;\n' +
-  '#endif\n' +
-  'uniform sampler2D u_Sampler;\n' +
-  'varying vec2 v_TexCoord;\n' +
-  'void main() {\n' +
-  '  gl_FragColor = texture2D(u_Sampler, v_TexCoord);\n' +
-  '}\n';
 
 function main() {
   // Retrieve <canvas> element
@@ -31,11 +11,7 @@ function main() {
     return;
   }
 
-  // Initialize shaders
-  if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
-    console.log('Failed to intialize shaders.');
-    return;
-  }
+  initShaders(gl, document.getElementById("shader-vert").text, document.getElementById("shader-frag").text);
 
   // Set the vertex information
   var n = initVertexBuffers(gl);
@@ -46,56 +22,93 @@ function main() {
 
   // Specify the color for clearing <canvas>
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.enable(gl.DEPTH_TEST);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+
+
+  gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
   // Set texture
-  if (!initTextures(gl, n)) {
-    console.log('Failed to intialize the texture.');
-    return;
-  }
+  // if (!initTextures(gl, n)) {
+  //   console.log('Failed to intialize the texture.');
+  //   return;
+  // }
 }
 
 function initVertexBuffers(gl) {
-  var verticesTexCoords = new Float32Array([
-    // Vertex coordinates, texture coordinate
-    -0.5,  0.5,   0.0, 1.0,
-    -0.5, -0.5,   0.0, 0.0,
-     0.5,  0.5,   1.0, 1.0,
-     0.5, -0.5,   1.0, 0.0,
-  ]);
-  var n = 4; // The number of vertices
 
-  // Create the buffer object
-  var vertexTexCoordBuffer = gl.createBuffer();
-  if (!vertexTexCoordBuffer) {
+  var SPHERE_DIV = 200;
+  var p1, p2;
+  var indices = [];
+
+  // Generate indices
+  for (s = 0; s < SPHERE_DIV; s++) {
+    for (t = 0; t < SPHERE_DIV; t++) {
+      p1 = s * (SPHERE_DIV+1) + t;
+      p2 = p1 + (SPHERE_DIV+1);
+
+      indices.push(p1);
+      indices.push(p2);
+      indices.push(p1 + 1);
+
+      indices.push(p1 + 1);
+      indices.push(p2);
+      indices.push(p2 + 1);
+    }
+  }
+
+  // Write the indices to the buffer object
+  var indexBuffer = gl.createBuffer();
+  if (!indexBuffer) {
     console.log('Failed to create the buffer object');
     return -1;
   }
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
-  // Bind the buffer object to target
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexTexCoordBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, verticesTexCoords, gl.STATIC_DRAW);
 
-  var FSIZE = verticesTexCoords.BYTES_PER_ELEMENT;
-  //Get the storage location of a_Position, assign and enable buffer
-  var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-  if (a_Position < 0) {
-    console.log('Failed to get the storage location of a_Position');
-    return -1;
-  }
-  gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * 4, 0);
-  gl.enableVertexAttribArray(a_Position);  // Enable the assignment of the buffer object
+  // var verticesTexCoords = new Float32Array([
+  //   // Vertex coordinates, texture coordinate
+  //   -0.5,  0.5,   0.0, 1.0,
+  //   -0.5, -0.5,   0.0, 0.0,
+  //    0.5,  0.5,   1.0, 1.0,
+  //    0.5, -0.5,   1.0, 0.0,
+  // ]);
+  // var n = 4; // The number of vertices
 
-  // Get the storage location of a_TexCoord
-  var a_TexCoord = gl.getAttribLocation(gl.program, 'a_TexCoord');
-  if (a_TexCoord < 0) {
-    console.log('Failed to get the storage location of a_TexCoord');
-    return -1;
-  }
-  // Assign the buffer object to a_TexCoord variable
-  gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, FSIZE * 4, FSIZE * 2);
-  gl.enableVertexAttribArray(a_TexCoord);  // Enable the assignment of the buffer object
+  // // Create the buffer object
+  // var vertexTexCoordBuffer = gl.createBuffer();
+  // if (!vertexTexCoordBuffer) {
+  //   console.log('Failed to create the buffer object');
+  //   return -1;
+  // }
 
-  return n;
+  // // Bind the buffer object to target
+  // gl.bindBuffer(gl.ARRAY_BUFFER, vertexTexCoordBuffer);
+  // gl.bufferData(gl.ARRAY_BUFFER, verticesTexCoords, gl.STATIC_DRAW);
+
+  // var FSIZE = verticesTexCoords.BYTES_PER_ELEMENT;
+  // //Get the storage location of a_Position, assign and enable buffer
+  // var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+  // if (a_Position < 0) {
+  //   console.log('Failed to get the storage location of a_Position');
+  //   return -1;
+  // }
+  // gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * 4, 0);
+  // gl.enableVertexAttribArray(a_Position);  // Enable the assignment of the buffer object
+
+  // // Get the storage location of a_TexCoord
+  // var a_TexCoord = gl.getAttribLocation(gl.program, 'a_TexCoord');
+
+  // if (a_TexCoord < 0) {
+  //   console.log('Failed to get the storage location of a_TexCoord');
+  //   return -1;
+  // }
+  // // Assign the buffer object to a_TexCoord variable
+  // gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, FSIZE * 4, FSIZE * 2);
+  // gl.enableVertexAttribArray(a_TexCoord);  // Enable the assignment of the buffer object
+
+  return indices.length;
 }
 
 function initTextures(gl, n) {
