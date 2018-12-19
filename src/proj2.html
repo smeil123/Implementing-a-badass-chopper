@@ -22,14 +22,8 @@
 				uniform sampler2D	uSampler;
 
 				void main(){
-					float x,y;
-					x = aPosition.x;
-					y = aPosition.y;
-
-					float z;
 					vec3 temp = (vec3(texture2D(uSampler,aTexCoord)));
-
-					z = ((temp.x + temp.y + temp.z)* 1.0)-2.0;
+					float z = ((temp.x + temp.y + temp.z)* 1.0)-2.0;
 
 					gl_Position = MVP*vec4(aPosition,z,1);
 					vTexCoord = aTexCoord;
