@@ -13,6 +13,40 @@
 		<p id="output">
 		</p>
 		</div>
+		<script id = "SRC_VERT_GRID" type = "x-shader/x-vertex">
+				attribute vec2	aPosition;
+				attribute vec2	aTexCoord;
+				uniform mat4	MVP;
+				uniform mat4	MV;
+				varying vec2	vTexCoord;
+				uniform sampler2D	uSampler;
+
+				void main(){
+					float x,y;
+					x = aPosition.x;
+					y = aPosition.y;
+
+					float z;
+					vec3 temp = (vec3(texture2D(uSampler,aTexCoord)));
+
+					z = ((temp.x + temp.y + temp.z)* 1.0)-2.0;
+
+					gl_Position = MVP*vec4(aPosition,z,1);
+					vTexCoord = aTexCoord;
+				}
+		</script>
+		<script id = "SRC_FRAG_GRID" type = "x-shader/x-fragment">
+				#ifdef GL_ES
+				precision mediump float;
+				#endif
+				uniform vec3	uColor;
+				varying vec2	vTexCoord;
+				uniform sampler2D	uSampler;
+				void main(){
+					gl_FragColor = vec4(uColor, 1);
+					// gl_FragColor = texture2D(uSampler, vTexCoord);
+				}
+		</script>
 		<script src="../lib/webgl-utils.js"></script>
 		<script src="../lib/webgl-debug.js"></script>
 		<script src="../lib/cuon-utils.js"></script>
@@ -20,7 +54,6 @@
 		<script src="class_shader.js"></script>
 		<script src="class_mesh.js"></script>
 		<script src="class_axes.js"></script>
-		<script src="create_mesh_sphere.js"></script>
 		<script src="proj2.js"></script>
 	</body>
 </html>
