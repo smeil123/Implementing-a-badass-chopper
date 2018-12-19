@@ -1,4 +1,44 @@
 // PointLightedCube.js (c) 2012 matsuda and kanda
+// Vertex shader program
+var VSHADER_SOURCE =
+  'attribute vec4 a_Position;\n' +
+   //  'attribute vec4 a_Color;\n' + // Defined constant in main()
+  'attribute vec4 a_Normal;\n' +
+  'uniform mat4 u_MvpMatrix;\n' +
+  'uniform mat4 u_ModelMatrix;\n' +    // Model matrix
+  'uniform mat4 u_NormalMatrix;\n' +   // Transformation matrix of the normal
+  'uniform vec3 u_LightColor;\n' +     // Light color
+  'uniform vec3 u_LightPosition;\n' +  // Position of the light source
+  'uniform vec3 u_AmbientLight;\n' +   // Ambient light color
+  'varying vec4 v_Color;\n' +
+  'void main() {\n' +
+  '  vec4 color = vec4(1.0, 1.0, 1.0, 1.0);\n' + // Sphere color
+  '  gl_Position = u_MvpMatrix * a_Position;\n' +
+     // Calculate a normal to be fit with a model matrix, and make it 1.0 in length
+  '  vec3 normal = normalize(vec3(u_NormalMatrix * a_Normal));\n' +
+     // Calculate world coordinate of vertex
+  '  vec4 vertexPosition = u_ModelMatrix * a_Position;\n' +
+     // Calculate the light direction and make it 1.0 in length
+  '  vec3 lightDirection = normalize(u_LightPosition - vec3(vertexPosition));\n' +
+     // The dot product of the light direction and the normal
+  '  float nDotL = max(dot(lightDirection, normal), 0.0);\n' +
+     // Calculate the color due to diffuse reflection
+  '  vec3 diffuse = u_LightColor * color.rgb * nDotL;\n' +
+     // Calculate the color due to ambient reflection
+  '  vec3 ambient = u_AmbientLight * color.rgb;\n' +
+     // Add the surface colors due to diffuse reflection and ambient reflection
+  '  v_Color = vec4(diffuse + ambient, color.a);\n' + 
+  '}\n';
+
+// Fragment shader program
+var FSHADER_SOURCE =
+  '#ifdef GL_ES\n' +
+  'precision mediump float;\n' +
+  '#endif\n' +
+  'varying vec4 v_Color;\n' +
+  'void main() {\n' +
+  '  gl_FragColor = v_Color;\n' +
+  '}\n';
 
 function main() {
   // Retrieve <canvas> element
@@ -10,15 +50,12 @@ function main() {
     console.log('Failed to get the rendering context for WebGL');
     return;
   }
-  
-  //html 에 있는 shader 사용
-  initShaders(gl, document.getElementById("shader-vert").text, document.getElementById("shader-frag").text);
-  
+
   // Initialize shaders
-  // if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
-  //   console.log('Failed to intialize shaders.');
-  //   return;
-  // }
+  if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
+    console.log('Failed to intialize shaders.');
+    return;
+  }
 
   // Set the vertex coordinates, the color and the normal
   var n = initVertexBuffers(gl);
@@ -42,11 +79,6 @@ function main() {
     console.log('Failed to get the storage location');
     return;
   }
-
-  // if (!initTextures(gl, n)) {
-  //   console.log('Failed to intialize the texture.');
-  //   return;
-  // }
 
   // Set the light color (white)
   gl.uniform3f(u_LightColor, 0.8, 0.8, 0.8);
@@ -80,40 +112,38 @@ function main() {
 
   // Draw the cube(Note that the 3rd argument is the gl.UNSIGNED_SHORT)
   gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
-
-
 }
 
 function initVertexBuffers(gl) { // Create a sphere
-  var SPHERE_DIV = 100;
+  var SPHERE_DIV = 13;
 
-  var t, at, st, ct;
-  var s, as, ss, cs;
+  var i, ai, si, ci;
+  var j, aj, sj, cj;
   var p1, p2;
 
   var positions = [];
   var indices = [];
 
   // Generate coordinates
-  for (s = 0; s <= SPHERE_DIV; s++) {
-    as = s * 200 - (200/2);
-    ss = Math.sin(as);
-    cs = Math.cos(as);
-    for (t = 0; t <= SPHERE_DIV; t++) {
-      at = t * 200 - (200/2);
-      st = Math.sin(at);
-      ct = Math.cos(at);
+  for (j = 0; j <= SPHERE_DIV; j++) {
+    aj = j * Math.PI / SPHERE_DIV;
+    sj = Math.sin(aj);
+    cj = Math.cos(aj);
+    for (i = 0; i <= SPHERE_DIV; i++) {
+      ai = i * 2 * Math.PI / SPHERE_DIV;
+      si = Math.sin(ai);
+      ci = Math.cos(ai);
 
-      positions.push(as);  // X
-      positions.push(at);  // Y
-      positions.push(0);  // Z
+      positions.push(si * sj);  // X
+      positions.push(cj);       // Y
+      positions.push(ci * sj);  // Z
     }
   }
 
   // Generate indices
-  for (s = 0; s < SPHERE_DIV; s++) {
-    for (t = 0; t < SPHERE_DIV; t++) {
-      p1 = s * (SPHERE_DIV+1) + t;
+  for (j = 0; j < SPHERE_DIV; j++) {
+    for (i = 0; i < SPHERE_DIV; i++) {
+      p1 = j * (SPHERE_DIV+1) + i;
       p2 = p1 + (SPHERE_DIV+1);
 
       indices.push(p1);
@@ -132,7 +162,7 @@ function initVertexBuffers(gl) { // Create a sphere
   if (!initArrayBuffer(gl, 'a_Position', new Float32Array(positions), gl.FLOAT, 3)) return -1;
   if (!initArrayBuffer(gl, 'a_Normal', new Float32Array(positions), gl.FLOAT, 3))  return -1;
   
-  // Unbind the buffer obect
+  // Unbind the buffer object
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
   // Write the indices to the buffer object
@@ -170,52 +200,4 @@ function initArrayBuffer(gl, attribute, data, type, num) {
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
   return true;
-}
-
-
-function initTextures(gl, n) {
-  var texture = gl.createTexture();   // Create a texture object
-  if (!texture) {
-    console.log('Failed to create the texture object');
-    return false;
-  }
-
-  // Get the storage location of u_Sampler
-  var u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler');
-  if (!u_Sampler) {
-    console.log('Failed to get the storage location of u_Sampler');
-    return false;
-  }
-  var image = new Image();  // Create the image object
-  if (!image) {
-    console.log('Failed to create the image object');
-    return false;
-  }
-  // Register the event handler to be called on loading an image
-  image.onload = function(){ loadTexture(gl, n, texture, u_Sampler, image); };
-  // Tell the browser to load an image
-  image.src = './yorkville.jpg';
-
-  return true;
-}
-
-function loadTexture(gl, n, texture, u_Sampler, image) {
-  //픽셀저장모드를 지정한다(이미지 coordinate와 webgl coordinate가 다르기때문에 필요하다)
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);
-  // 2단계로 bind한다
-  // 바인드하고자 하는 target이 들어있는 texture unit을 active한다
-  // 한번에 1개의 texture unit만 active될 수 있다.(active함수를 호출하지 않으면 default는 texture0)
-  gl.activeTexture(gl.TEXTURE0);
-  //현재 active한 texture unit과 texture obj를 bind한다
-  gl.bindTexture(gl.TEXTURE_2D,texture);
-  //매핑되는 픽셀수가 다를경우 어떻게 정보를 가져올지 정한다 -> TEXTURE_MIN_FILTER
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-  //image data를 cpu에서 gpu로 업로드
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,image);
-
-  gl.uniform1i(u_Sampler,0);
-
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,n);
 }
