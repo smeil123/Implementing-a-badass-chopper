@@ -8,7 +8,7 @@
 		<canvas id="webgl" width="1024" height="1024">
 			Please use a browser that supports "canvas"
 		</canvas>
-		<script id = "SRC_VERT" type = "x-shader/x-vertex">
+		<script id = "vert_body" type = "x-shader/x-vertex">
 			attribute vec4	aPosition;
 			attribute vec4 	aColor;
 			varying vec4 vColor;
@@ -19,7 +19,7 @@
 				vColor = aColor;
 			}
 		</script>
-		<script id = "SRC_FRAG" type = "x-shader/x-fragment">
+		<script id = "frag_body" type = "x-shader/x-fragment">
 			#ifdef GL_ES
 			precision mediump float;
 			#endif
@@ -28,7 +28,7 @@
 				gl_FragColor = vColor;
 			}
 		</script>
-		<script id = "SRC_VERT_TEX" type = "x-shader/x-vertex">
+		<!-- <script id = "SRC_VERT_TEX" type = "x-shader/x-vertex">
 			attribute vec4	aPosition;
 			attribute vec2	aTexCoord;
 			uniform mat4	MVP;
@@ -49,8 +49,8 @@
 			void main(){
 				gl_FragColor = texture2D(uSampler, vTexCoord);
 			}
-		</script>
-		<script id = "SRC_VERT_GRID" type = "x-shader/x-vertex">
+		</script> -->
+		<script id = "vert_grid" type = "x-shader/x-vertex">
 			attribute vec2	aPosition;
 			attribute vec2	aTexCoord;
 
@@ -60,41 +60,44 @@
 			uniform sampler2D	uSampler;
 
 			varying vec3	v_Normal;
-			varying vec4 	v_PosEye;				
+			varying vec4 	v_PosEye;
 
 			void main(){
-				v_PosEye = MV*vec4(aPosition,0.0,0.0);
 
 				// 텍스쳐에서 s,t에 위치한 값을 가져온다 -> z값을 계산
 				vec3 texture_z = vec3(texture2D(uSampler,aTexCoord));
 				// float z = ((texture_z.x + texture_z.y + texture_z.z)* 1.0)-2.0;
-				float z = ((texture_z.x+ texture_z.y+ texture_z.z)*0.4);
+				float z = (texture_z.x)*1.4;
 
-				// 텍스쳐함수 미분값을 근사한다 
-				vec3 central_1 = vec3(texture2D(uSampler,vec2(aTexCoord.x+0.1,0)));
-				vec3 central_2 = vec3(texture2D(uSampler,vec2(aTexCoord.x-0.1,0)));
+				// 텍스쳐함수 미분값을 근사한다
+				vec3 central_1 = vec3(texture2D(uSampler,vec2(aTexCoord.x+0.0001,aTexCoord.y)));
+				vec3 central_2 = vec3(texture2D(uSampler,vec2(aTexCoord.x-0.0001,aTexCoord.y)));
 
-				float z_differential_1 = (((central_1.x + central_1.y + central_1.z)* 1.0)-((central_2.x + central_2.y + central_2.z)* 1.0))/ 0.2;
+				vec3 texture_differential = normalize(vec3((central_1.x-central_2.x)/0.02,(central_1.y-central_2.y)/0.02,(central_1.y-central_2.y)/0.02));
+				float z_differential_1 = ((central_1.x-central_2.x)/0.0002*1.4);
 
-				central_1 = vec3(texture2D(uSampler,vec2(0,aTexCoord.y+0.1)));
-				central_2 = vec3(texture2D(uSampler,vec2(0,aTexCoord.y-0.1)));
+				central_1 = vec3(texture2D(uSampler,vec2(aTexCoord.x,aTexCoord.y+0.0001)));
+				central_2 = vec3(texture2D(uSampler,vec2(aTexCoord.x,aTexCoord.y-0.0001)));
 
-				float z_differential_2 = (((central_1.x + central_1.y + central_1.z)* 1.0)-((central_2.x + central_2.y + central_2.z)* 1.0))/ 0.2;
+				texture_differential = normalize(vec3((central_1.x-central_2.x)/0.02,(central_1.y-central_2.y)/0.02,(central_1.y-central_2.y)/0.02));
+				float z_differential_2 = ((central_1.x-central_2.x)/0.0002*1.4);
 
 				// s로 편미분한 값
-				vec3 s_differential = vec3(aPosition.x,0.0,z_differential_1);
+				vec3 s_differential = vec3(1.0,0.0,z_differential_1);
 				// t로 편미분한 값
-				vec3 t_differential = vec3(0.0,aPosition.y,z_differential_2);
+				vec3 t_differential = vec3(0.0,1.0,z_differential_2);
 
 				// 각 미분한 값을 합해준다
-				vec3 sub_Normal = normalize(vec3(s_differential*t_differential));
-				v_Normal = normalize((matNormal*vec4(sub_Normal,0)).xyz);
+				v_Normal = vec3(s_differential*t_differential);
+				//v_Normal = (matNormal*vec4(sub_Normal,0)).xyz;
 
 				// grid 와 계산한 z값
 				gl_Position = MVP*vec4(aPosition,z-0.5,1);
+				v_PosEye = MV*vec4(aPosition,z-0.5,1);
+
 			}
 		</script>
-		<script id = "SRC_FRAG_GRID" type = "x-shader/x-fragment">
+		<script id = "frag_grid" type = "x-shader/x-fragment">
 			#ifdef GL_ES
 			precision mediump float;
 			#endif
@@ -134,11 +137,11 @@
 							l = normalize((light[i].position - v_PosEye).xyz);
 						else
 							l = normalize((light[i].position).xyz);
-						vec3	r = reflect(-l, n);
-						float	l_dot_n = max(dot(l, n), 0.0);
-						vec3	ambient = light[i].ambient * material.ambient;
-						vec3	diffuse = light[i].diffuse * material.diffuse * l_dot_n;
-						vec3	specular = vec3(0.5, 0.2, 0.0);
+							vec3	r = reflect(-l, n);
+							float	l_dot_n = max(dot(l, n), 0.0);
+							vec3	ambient = light[i].ambient * material.ambient;
+							vec3	diffuse = light[i].diffuse * material.diffuse * l_dot_n;
+							vec3	specular = vec3(0.5, 0.2, 0.0);
 						if(l_dot_n > 0.0)
 						{
 							specular = light[i].specular * material.specular * pow(max(dot(r, v), 0.0), material.shininess);
@@ -158,6 +161,6 @@
 		<script src="class_axes.js"></script>
 		<script src="class_light.js"></script>
 		<script src="class_material.js"></script>
-		<script src="proj2.js"></script>
+		<script src="final_project.js"></script>
 	</body>
 </html>

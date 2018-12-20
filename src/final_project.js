@@ -1,7 +1,8 @@
 "use strict";
 
 var ANGLE_STEP = 45.0;
-
+var bullet = [10];
+var bullet_flag = [10];
 function main()
 {
 	var canvas = document.getElementById('webgl');
@@ -13,32 +14,40 @@ function main()
 	var V = new Matrix4();
 	V.setLookAt(3, 2, 3, 0, 0, 0, 0, 0, 1);
 
+	var light_V = new Matrix4();
+	light_V.setLookAt(3, 2, 3, 0, 0, 0, 0, 0, 1);
 
-	//fov수정
-	var fov = 50;
 	var P = new Matrix4();
 	P.setPerspective(55, 1, 1, 200);
 
-	//axes 삭제
-	var axes = new Axes(gl);
-
 	var chopper_shader = new Shader(gl,
-		document.getElementById("SRC_VERT").text,
-		document.getElementById("SRC_FRAG").text, 
+		document.getElementById("vert_body").text,
+		document.getElementById("frag_body").text,
 		["aPosition","aColor"]);
 
-	var grid_shader = new Shader(gl, 
-		document.getElementById("SRC_VERT_GRID").text,
-		document.getElementById("SRC_FRAG_GRID").text, 
+	var grid_shader = new Shader(gl,
+		document.getElementById("vert_grid").text,
+		document.getElementById("frag_grid").text,
 		["aPosition", "aTexCoord"]);
 
-	// var shader_tex = new Shader(gl, SRC_VERT_TEX, SRC_FRAG_TEX, ["aPosition", "aTexCoord"]);
+	var i;
+	for (i=0; i<10; i++){
+		bullet[i] = new Light(
+			gl,
+			[0.0, 0.0, 0.0, 0.0],
+			[0.5, 0.2, 0.0, 1.0], // ambient
+      [0.5, 0.2, 0.0, 1.0], // diffusive
+      [1.0, 1.0, 1.0, 1.0], // specular
+      false
+		);
+		bullet_flag[i] = 1; //1 -> 동작하지 않는 중
+	}
 
 	var body = create_body(gl);
 	body.M.setTranslate(0,0,1.0);
 
 	var rotor = create_propeller(gl);
-	var terrain = create_mesh_sphere(gl,100);
+	var terrain = create_mesh_sphere(gl,200);
 
 	var isShift = false;
 
@@ -50,57 +59,49 @@ function main()
 				break;
 		}
 	}
-	var c_current_ty = 0.0;
-	var c_current_tx = 0.0;
-
 	document.getElementsByTagName("BODY")[0].onkeydown = function(ev) {
 		console.log(ev.key);
 		switch(ev.key)
 		{
 			case 'ArrowUp':
 				if(isShift){
+					// V.translate(0,0,0.05);
+    				V.rotate(-10*Math.PI/45,1,0,0);
+    				V.rotate(10*Math.PI/45,0,1,0);
 				}
 				else{
-					body.M.translate(0, .05, 0);
+					body.M.translate(0, 0.05, 0);
 				}
 				break;
 			case 'ArrowDown':
 				if(isShift){
-					
+    				V.rotate(10*Math.PI/45,1,0,0);
+    				V.rotate(-10*Math.PI/45,0,1,0);
+
+    				// V.translate(0,0,-0.05);
 				}
 				else{
-					body.M.translate(0, -.05, 0);
-				}				
+					body.M.translate(0, -0.05, 0);
+				}
 				break;
 			case 'ArrowLeft':
 				if(isShift){
-					c_current_ty = Math.cos(10*Math.PI/180)*0.05;
-    				c_current_tx = Math.sin(10*Math.PI/180)*0.05; 
-    				// P.rotate(10*Math.PI/180,0,0,1);
-    				P.translate(c_current_ty,c_current_tx,0);
-
-					// P.lookAt(1, 0, 0, 0, 0, -5, 0, 1, 0);
+    				V.rotate(20*Math.PI/180,0,0,1);
 				}
 				else{
 					body.M.rotate(-10, 0, 0, 1);
-				}				
+				}
 				break;
 			case 'ArrowRight':
 				if(isShift){
-					c_current_ty = -Math.cos(10*Math.PI/180)*0.05;
-    				c_current_tx = -Math.sin(10*Math.PI/180)*0.05; 
-    				// P.rotate(-10*Math.PI/180,0,0,1);
-					P.translate(c_current_ty,c_current_tx,0);
-    				
-
-					// P.lookAt(-1, 0, 0, 0, 0, -5, 0, 1, 0);
+    				V.rotate(-20*Math.PI/180,0,0,1);
 				}
 				else{
 					body.M.rotate(10, 0, 0, 1);
-				}				
+				}
 				break;
 			case 'a':
-				body.M.translate(0, 0, .05);
+				body.M.translate(0, 0, 0.05);
 				break;
 			case 'A':
 				body.M.translate(0, 0, .05);
@@ -109,34 +110,34 @@ function main()
 				body.M.translate(0, 0, -.05);
 				break;
 			case 'Z':
-				body.M.translate(0, 0, -.05);
+				body.M.translate(0, 0, -0.05);
 				break;
 			case '=':
-			//확대
-				// fov = Math.max(fov-5, 5);
+			//Zoom In
 				P.lookAt(0, 0, -0.1, 0, 0, -5, 0, 1, 0);
 				break;
 			case '+':
-			//확대
-				// fov = Math.max(fov-5, 5);
+			//Zoom In
 				P.lookAt(0, 0, -0.1, 0, 0, -5, 0, 1, 0);
 				break;
 			case '-':
-			//축소
-				// fov = Math.min(fov+5, 120);
+			//Zoom out
 				P.lookAt(0, 0, 0.1, 0, 0, -5, 0, 1, 0);
 				break;
 			case '_':
-			//축소
-				// fov = Math.min(fov+5, 120);
+			//Zoom out
 				P.lookAt(0, 0, 0.1, 0, 0, -5, 0, 1, 0);
 				break;
 			case 'Shift':
 				isShift = true;
 				break;
+			case ' ':
+					shooting(body);
+					break;
 
 		}
 	};
+
 	//P.translate(0.01,0,0);
 
 	var texture = gl.createTexture();
@@ -162,20 +163,9 @@ function main()
 	image.src = 'yorkville.jpg';
 
 	var textures = [];
-	textures['uSampler'] = {texid:texture};	
+	textures['uSampler'] = {texid:texture};
 
-	var list_lights = 
-	[
-		new Light
-		(
-			gl,
-			[1.0, 1.0, 1.0, 1.0],	// position
-			[0.6, 0.3, 0.1, 1.0],	// ambient
-			[0.3, 0.5, 1.0, 1.0],	// diffusive
-			[1.0, 1.0, 1.0, 1.0],	// specular
-			false
-		),
-		new Light
+	var lights =		new Light
 		(
 			gl,
 			[0.0, 3.0, 3.0, 1.0],
@@ -183,8 +173,7 @@ function main()
 			[0.5, 0.2, 0.0, 1.0],
 			[1.0, 1.0, 1.0, 1.0],
 			false
-		)
-	];
+		);
 
 	var t_last = Date.now();
 
@@ -198,38 +187,61 @@ function main()
 
 		angle_rotor += ( (ANGLE_STEP * elapsed) / 1000.0) % 360.0;
 
-		// list_lights[0].M.rotate(( (ANGLE_STEP * elapsed) / 1000.0) % 360.0, 0, 0, 1);
-
 		rotor.M.set(body.M);
 		rotor.M.rotate(angle_rotor, 0, 0, 1);
 
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-		axes.render(gl, V, P);
-
 		gl.useProgram(chopper_shader.h_prog);
-		// gl.uniform3f(gl.getUniformLocation(chopper_shader.h_prog, "uColor"), 1, .5, .5);
 		body.render(gl, chopper_shader, null, null, V, P);
 
 		gl.useProgram(chopper_shader.h_prog);
-		// gl.uniform3f(gl.getUniformLocation(chopper_shader.h_prog, "uColor"), .5, 1, .5);
 		rotor.render(gl, chopper_shader, null, null, V, P);
 
-		
-		//움직이는 불빛
-		// list_lights[0].turn_on(true);
-		// list_lights[0].set_type(true);
-		// list_lights[0].render(gl, V, P);
+		var list_lights = [11];
+		var light_index = 0;
+		var i;
+		for(i=0; i<10; i++){
+
+			if(bullet_flag[i] == 2){
+				bullet[i].M.set(body.M);
+				// bullet[i].M.translate(0.001,0.0,0.0);
+				bullet[i].turn_on(true);
+				bullet[i].set_type(true);
+				bullet[i].render(gl, V, P);
+
+				list_lights[light_index++] = bullet[i];
+
+				bullet_flag[i] =3;
+			}
+			else if(bullet_flag[i] == 3){
+				// bullet[i].position.z -= 10.0 ;
+
+				bullet[i].M.translate(0.0,-0.01,-elapsed*0.0002);
+				console.log(bullet[i].M.elements[14]);
+				bullet[i].turn_on(true);
+				bullet[i].set_type(true);
+				bullet[i].render(gl, V, P);
+
+				list_lights[light_index++] = bullet[i];
+			}
+			if(bullet[i].M.elements[14] < 0){
+				console.log("z가 마이너스");
+				bullet_flag[i] = 1;
+			}
+		}
 
 		// 고정된 불빛
-		list_lights[1].turn_on(true);
-		list_lights[1].set_type(true);
-		list_lights[1].render(gl, V, P);
+		lights.turn_on(true);
+		lights.set_type(true);
+		lights.render(gl, light_V, P);
+
+		list_lights[light_index] = lights;
 
 		gl.useProgram(grid_shader.h_prog);
 		// gl.uniform3f(gl.getUniformLocation(grid_shader.h_prog, "uColor"), .5, 1, .5);
 		// gl, shader, lights, material, V, P, textures
-		terrain.render(gl, grid_shader, list_lights, __js_materials["bronze"], V, P,textures);
+		terrain.render(gl, grid_shader, [lights],null, V, P,textures);
 
 		requestAnimationFrame(tick, canvas); // Request that the browser calls tick
 	};
@@ -307,8 +319,8 @@ function create_propeller(gl)
 
 	var indexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);	
-	
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
 	return new Mesh(gl, "drawElements", gl.TRIANGLES, indices.length, attribs, indexBuffer, gl.UNSIGNED_BYTE);
 }
 
@@ -329,7 +341,7 @@ function create_body(gl) {
 	    0.1, 0.1, 0.1,   0.1, 0.1,-0.1,  -0.1, 0.1,-0.1,  -0.1, 0.1, 0.1,  // v0-v5-v6-v1 up
 	    -0.1, 0.1, 0.1,  -0.1, 0.1,-0.1,  -0.1,-0.1,-0.1,  -0.1,-0.1, 0.1,  // v1-v6-v7-v2 left
 	    -0.1,-0.1,-0.1,   0.1,-0.1,-0.1,   0.1,-0.1, 0.1,  -0.1,-0.1, 0.1,  // v7-v4-v3-v2 down
-	    0.1,-0.1,-0.1,  -0.1,-0.1,-0.1,  -0.1, 0.1,-0.1,   0.1, 0.1,-0.1,   // v4-v7-v6-v5 back 
+	    0.1,-0.1,-0.1,  -0.1,-0.1,-0.1,  -0.1, 0.1,-0.1,   0.1, 0.1,-0.1,   // v4-v7-v6-v5 back
 
 	    //헬리콥터 앞부분
 	    0.07, 0.07+0.1, 0.07,  -0.07, 0.07+0.1, 0.07,  -0.07,-0.07+0.1, 0.07,   0.07,-0.07+0.1, 0.07,  // v0-v1-v2-v07 front
@@ -341,21 +353,21 @@ function create_body(gl) {
 
 	]);
 
-	var colors = new Float32Array([     
+	var colors = new Float32Array([
 		// Colors
 	    0.4, 0.4, 1.0,  0.4, 0.4, 1.0,  0.4, 0.4, 1.0,  0.4, 0.4, 1.0,  // v0-v1-v2-v3 front(blue)
 	    0.4, 1.0, 0.4,  0.4, 1.0, 0.4,  0.4, 1.0, 0.4,  0.4, 1.0, 0.4,  // v0-v3-v4-v5 right(green)
 	    1.0, 0.4, 0.4,  1.0, 0.4, 0.4,  1.0, 0.4, 0.4,  1.0, 0.4, 0.4,  // v0-v5-v6-v1 up(red)
 	    1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  // v1-v6-v7-v2 left
 	    1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  // v7-v4-v3-v2 down
-	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,   // v4-v7-v6-v5 back 
+	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,   // v4-v7-v6-v5 back
 
 	    0.4, 0.4, 1.0,  0.4, 0.4, 1.0,  0.4, 0.4, 1.0,  0.4, 0.4, 1.0,  // v0-v1-v2-v3 front(blue)
 	    0.4, 1.0, 0.4,  0.4, 1.0, 0.4,  0.4, 1.0, 0.4,  0.4, 1.0, 0.4,  // v0-v3-v4-v5 right(green)
 	    0.0, 0.4, 0.4,  0.0, 0.4, 0.4,  0.0, 0.4, 0.4,  0.0, 0.4, 0.4,  // v0-v5-v6-v1 up(red)
 	    1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  // v1-v6-v7-v2 left
 	    1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  // v7-v4-v3-v2 down
-	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0   // v4-v7-v6-v5 back 
+	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0   // v4-v7-v6-v5 back
     ]);
 
     // 12개의 triangle을 정의
@@ -374,7 +386,7 @@ function create_body(gl) {
     	16+24,17+24,18+24,  16+24,18+24,19+24,    // down
     	20+24,21+24,22+24,  20+24,22+24,23+24    // back
 
-	]); 
+	]);
 
 	var buf_position = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, buf_position);
@@ -392,8 +404,8 @@ function create_body(gl) {
 
 	var indexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);	
-	
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
 	return new Mesh(gl, "drawElements", gl.TRIANGLES, indices.length, attribs, indexBuffer, gl.UNSIGNED_BYTE);
 }
 
@@ -421,7 +433,7 @@ function create_mesh_sphere(gl, SPHERE_DIV)
 			ci = ai - (1/2);
 
 			positions.push(sj);  // X
-			positions.push(si);       // Y
+			positions.push(si);  // Y
 
 			texture_position.push(cj);
 			texture_position.push(ci);
@@ -480,24 +492,12 @@ function create_mesh_sphere(gl, SPHERE_DIV)
 	return new Mesh(gl, "drawElements", gl.TRIANGLES, indices.length, attribs, buf_index, gl.UNSIGNED_SHORT);
 }
 
-
-function create_terrain(gl)
-{
-	var verts = new Float32Array([
-		-2, -2, 0,  0, 0,
-		 2, -2, 0,  1, 0,
-		 2,  2, 0,  1, 1,
-		-2,  2, 0,  0, 1,
-	]);
-
-	var vbo = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-	gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-	var FSIZE = verts.BYTES_PER_ELEMENT;
-	var attribs = [];
-	attribs["aPosition"] = {buffer:vbo, size:3, type:gl.FLOAT, normalized:false, stride:FSIZE*5, offset:0};
-	attribs["aTexCoord"] = {buffer:vbo, size:2, type:gl.FLOAT, normalized:false, stride:FSIZE*5, offset:FSIZE*3};
-	gl.bindBuffer(gl.ARRAY_BUFFER, null);
-	return new Mesh(gl, "drawArrays", gl.TRIANGLE_FAN, verts.length / 5, attribs, -1, null);
-
+function shooting(body){
+	var index;
+	for(index = 0; index<10; index++){
+		if(bullet_flag[index] == 1){
+			bullet_flag[index] = 2; // 2는 동작하는 중
+			break;
+		}
+	}
 }
