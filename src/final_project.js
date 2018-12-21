@@ -11,6 +11,17 @@ function main()
 	gl.enable(gl.DEPTH_TEST);
 	gl.clearColor(0.2,0.2,0.2,1.0);
 
+	//각 기능에 따라 shader를 생성
+	var chopper_shader = new Shader(gl,
+		document.getElementById("vert_body").text,
+		document.getElementById("frag_body").text,
+		["aPosition","aColor","aNormal"]);
+
+	var grid_shader = new Shader(gl,
+		document.getElementById("vert_grid").text,
+		document.getElementById("frag_grid").text,
+		["aPosition", "aTexCoord"]);
+
 	var V = new Matrix4();
 	V.setLookAt(3, 2, 3, 0, 0, 0, 0, 0, 1);
 
@@ -20,16 +31,7 @@ function main()
 	var P = new Matrix4();
 	P.setPerspective(55, 1, 1, 200);
 
-	var chopper_shader = new Shader(gl,
-		document.getElementById("vert_body").text,
-		document.getElementById("frag_body").text,
-		["aPosition","aColor"]);
-
-	var grid_shader = new Shader(gl,
-		document.getElementById("vert_grid").text,
-		document.getElementById("frag_grid").text,
-		["aPosition", "aTexCoord"]);
-
+	// bullet 10개를 light객체로 생성한다
 	var i;
 	for (i=0; i<10; i++){
 		bullet[i] = new Light(
@@ -43,9 +45,9 @@ function main()
 		bullet_flag[i] = 1; //1 -> 동작하지 않는 중
 	}
 
+	// 헬리콥터생성
 	var body = create_body(gl);
 	body.M.setTranslate(0,0,1.0);
-
 	var rotor = create_propeller(gl);
 	var terrain = create_mesh_sphere(gl,200);
 
@@ -65,7 +67,7 @@ function main()
 		{
 			case 'ArrowUp':
 				if(isShift){
-					// V.translate(0,0,0.05);
+					// view 회전
     				V.rotate(-10*Math.PI/45,1,0,0);
     				V.rotate(10*Math.PI/45,0,1,0);
 				}
@@ -75,10 +77,9 @@ function main()
 				break;
 			case 'ArrowDown':
 				if(isShift){
+						// view 회전
     				V.rotate(10*Math.PI/45,1,0,0);
     				V.rotate(-10*Math.PI/45,0,1,0);
-
-    				// V.translate(0,0,-0.05);
 				}
 				else{
 					body.M.translate(0, -0.05, 0);
@@ -86,6 +87,7 @@ function main()
 				break;
 			case 'ArrowLeft':
 				if(isShift){
+					// view 회전
     				V.rotate(20*Math.PI/180,0,0,1);
 				}
 				else{
@@ -94,6 +96,7 @@ function main()
 				break;
 			case 'ArrowRight':
 				if(isShift){
+					// view 회전
     				V.rotate(-20*Math.PI/180,0,0,1);
 				}
 				else{
@@ -134,12 +137,11 @@ function main()
 			case ' ':
 					shooting(body);
 					break;
-
 		}
 	};
 
-	//P.translate(0.01,0,0);
 
+	// 텍스처 바인딩
 	var texture = gl.createTexture();
 	if (!texture) {
   		console.log('Failed to create the texture object');
@@ -155,8 +157,7 @@ function main()
 	    console.log('Failed to create the image object');
 	    return false;
 	 }
-	image.onload = function()
-	{
+	image.onload = function(){
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 	};
 
@@ -165,25 +166,26 @@ function main()
 	var textures = [];
 	textures['uSampler'] = {texid:texture};
 
+	// 고정된 불빛 생성
 	var lights =		new Light
 		(
 			gl,
-			[0.0, 3.0, 3.0, 1.0],
+			[-4.0, -5.0, 2.0, 1.0],
 			[0.5, 0.2, 0.0, 1.0],
 			[0.5, 0.2, 0.0, 1.0],
-			[1.0, 1.0, 1.0, 1.0],
+			[0.1, 0.1, 0.1, 1.0],
 			false
 		);
 
-	var t_last = Date.now();
-
+	var g_last = Date.now();
 	var angle_rotor = 0;
 
 	var tick = function()
 	{
+
 		var now = Date.now();
-		var elapsed = now - t_last;
-		t_last = now;
+		var elapsed = now - g_last;
+		g_last = now;
 
 		angle_rotor += ( (ANGLE_STEP * elapsed) / 1000.0) % 360.0;
 
@@ -192,42 +194,37 @@ function main()
 
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-		gl.useProgram(chopper_shader.h_prog);
-		body.render(gl, chopper_shader, null, null, V, P);
-
-		gl.useProgram(chopper_shader.h_prog);
-		rotor.render(gl, chopper_shader, null, null, V, P);
-
 		var list_lights = [11];
 		var light_index = 0;
 		var i;
-		for(i=0; i<10; i++){
+		for(i in bullet){
 
 			if(bullet_flag[i] == 2){
+				// bullet 생성
 				bullet[i].M.set(body.M);
-				// bullet[i].M.translate(0.001,0.0,0.0);
 				bullet[i].turn_on(true);
 				bullet[i].set_type(true);
 				bullet[i].render(gl, V, P);
-
 				list_lights[light_index++] = bullet[i];
 
 				bullet_flag[i] =3;
 			}
 			else if(bullet_flag[i] == 3){
-				// bullet[i].position.z -= 10.0 ;
-
+				// 날아가고 있는 bullet
 				bullet[i].M.translate(0.0,-0.01,-elapsed*0.0002);
-				console.log(bullet[i].M.elements[14]);
 				bullet[i].turn_on(true);
 				bullet[i].set_type(true);
 				bullet[i].render(gl, V, P);
 
 				list_lights[light_index++] = bullet[i];
 			}
+			//bullet이 너무 밑으로 떨어지면 안보이게 렌더
 			if(bullet[i].M.elements[14] < 0){
-				console.log("z가 마이너스");
 				bullet_flag[i] = 1;
+				bullet[i].M.set(body.M);
+				bullet[i].turn_on(false);
+				bullet[i].set_type(true);
+				bullet[i].render(gl, V, P);
 			}
 		}
 
@@ -236,14 +233,21 @@ function main()
 		lights.set_type(true);
 		lights.render(gl, light_V, P);
 
-		list_lights[light_index] = lights;
+		list_lights[light_index] =  lights;
+
+		console.log(list_lights.length);
+
+		gl.useProgram(chopper_shader.h_prog);
+		body.render(gl, chopper_shader, list_lights, null, V, P);
+
+		gl.useProgram(chopper_shader.h_prog);
+		rotor.render(gl, chopper_shader, list_lights, null, V, P);
 
 		gl.useProgram(grid_shader.h_prog);
-		// gl.uniform3f(gl.getUniformLocation(grid_shader.h_prog, "uColor"), .5, 1, .5);
 		// gl, shader, lights, material, V, P, textures
-		terrain.render(gl, grid_shader, [lights],null, V, P,textures);
+		terrain.render(gl, grid_shader,list_lights,null, V, P,textures);
 
-		requestAnimationFrame(tick, canvas); // Request that the browser calls tick
+		requestAnimationFrame(tick, canvas);
 	};
 
 	tick();
@@ -266,7 +270,7 @@ function create_propeller(gl)
       	0.01,  0.4,  0.12,   0.01, -0.4,  0.12,  -0.01, -0.4,  0.12,  -0.01,  0.4,  0.12,  // v0-v5-v6-v1 up
     	-0.01,  0.4,  0.12,  -0.01, -0.4,  0.12,  -0.01, -0.4,  0.1,  -0.01,  0.4,  0.1,  // v1-v6-v7-v2 left
         -0.01, -0.4,  0.1,   0.01, -0.4,  0.1,   0.01,  0.4,  0.1,  -0.01,  0.4,  0.1,  // v7-v4-v3-v2 down
-      	0.01, -0.4,  0.1,  -0.01, -0.4,  0.1,  -0.01, -0.4,  0.12,  0.01, -0.4,  0.12,  // v4-v7-v6-v5 back
+      	0.01, -0.4,  0.1,  -0.01, -0.4,  0.1,  -0.01, -0.4,  0.12,  0.01, -0.4,  0.12  // v4-v7-v6-v5 back
 	]);
 
 	var colors = new Float32Array([     // Colors
@@ -283,9 +287,25 @@ function create_propeller(gl)
 	    1.0, 0.4, 0.4,  1.0, 0.4, 0.4,  1.0, 0.4, 0.4,  1.0, 0.4, 0.4,  // v0-v5-v6-v1 up(red)
 	    1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  1.0, 1.0, 0.4,  // v1-v6-v7-v2 left
 	    1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  // v7-v4-v3-v2 down
-	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  // v4-v7-v6-v5 back
+	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0  // v4-v7-v6-v5 back
 
   	]);
+
+		var normals = new Float32Array([
+				0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,  // v0-v1-v2-v3 front
+				1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,  // v0-v3-v4-v5 right
+				0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,  // v0-v5-v6-v1 up
+			 -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  // v1-v6-v7-v2 left
+				0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,  // v7-v4-v3-v2 down
+				0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   // v4-v7-v6-v5 back
+
+				0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,  // v0-v1-v2-v3 front
+				1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,  // v0-v3-v4-v5 right
+				0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,  // v0-v5-v6-v1 up
+			 -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  // v1-v6-v7-v2 left
+				0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,  // v7-v4-v3-v2 down
+				0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0   // v4-v7-v6-v5 back
+			]);
 
   	var indices = new Uint8Array([
 	     0, 1, 2,   0, 2, 3,    // front
@@ -300,7 +320,7 @@ function create_propeller(gl)
      	8+24, 9+24,10+24,   8+24,10+24,11+24,    // up
     	12+24,13+24,14+24,  12+24,14+24,15+24,    // left
    		16+24,17+24,18+24,  16+24,18+24,19+24,    // down
-   		20+24,21+24,22+24,  20+24,22+24,23+24,    // back
+   		20+24,21+24,22+24,  20+24,22+24,23+24    // back
     ]);
 
 	var buf_position = gl.createBuffer();
@@ -311,11 +331,16 @@ function create_propeller(gl)
 	gl.bindBuffer(gl.ARRAY_BUFFER, buf_color);
 	gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
 
+	var buf_normal = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, buf_normal);
+	gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
 	var attribs = [];
 	attribs["aPosition"] = {buffer:buf_position, size:3, type:gl.FLOAT, normalized:false, stride:0, offset:0};
 	attribs["aColor"] = {buffer:buf_color, size:3, type:gl.FLOAT, normalized:false, stride:0, offset:0};
+	attribs["aNormal"] = {buffer:buf_normal, size:3, type:gl.FLOAT, normalized:false, stride:0, offset:0};
 
 	var indexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -370,6 +395,22 @@ function create_body(gl) {
 	    0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0,  0.4, 1.0, 1.0   // v4-v7-v6-v5 back
     ]);
 
+	var normals = new Float32Array([
+			0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,  // v0-v1-v2-v3 front
+			1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,  // v0-v3-v4-v5 right
+			0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,  // v0-v5-v6-v1 up
+		 -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  // v1-v6-v7-v2 left
+			0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,  // v7-v4-v3-v2 down
+			0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   // v4-v7-v6-v5 back
+
+			0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,   0.0, 0.0, 1.0,  // v0-v1-v2-v3 front
+			1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,   1.0, 0.0, 0.0,  // v0-v3-v4-v5 right
+			0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,   0.0, 1.0, 0.0,  // v0-v5-v6-v1 up
+		 -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  -1.0, 0.0, 0.0,  // v1-v6-v7-v2 left
+			0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,   0.0,-1.0, 0.0,  // v7-v4-v3-v2 down
+			0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0,   0.0, 0.0,-1.0   // v4-v7-v6-v5 back
+		]);
+
     // 12개의 triangle을 정의
 	var indices = new Uint8Array([
 	    0, 1, 2,   0, 2, 3,    // front
@@ -396,11 +437,16 @@ function create_body(gl) {
 	gl.bindBuffer(gl.ARRAY_BUFFER, buf_color);
 	gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
 
+	var buf_normal = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, buf_normal);
+	gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
 	var attribs = [];
 	attribs["aPosition"] = {buffer:buf_position, size:3, type:gl.FLOAT, normalized:false, stride:0, offset:0};
 	attribs["aColor"] = {buffer:buf_color, size:3, type:gl.FLOAT, normalized:false, stride:0, offset:0};
+	attribs["aNormal"] = {buffer:buf_normal, size:3, type:gl.FLOAT, normalized:false, stride:0, offset:0};
 
 	var indexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -437,7 +483,6 @@ function create_mesh_sphere(gl, SPHERE_DIV)
 
 			texture_position.push(cj);
 			texture_position.push(ci);
-			// positions.push(0);  // Z
 		}
 	}
 
@@ -480,7 +525,7 @@ function create_mesh_sphere(gl, SPHERE_DIV)
 
 	var attribs = [];
 	var FSIZE = positions.BYTES_PER_ELEMENT;
-//
+
 	attribs["aPosition"] = {buffer:buf_position, size:2, type:gl.FLOAT, normalized:false, stride:0, offset:0};
 	// attribs["aNormal"] = {buffer:buf_position, size:2, type:gl.FLOAT, normalized:false, stride:0, offset:0};
 	attribs["aTexCoord"] = {buffer:vbo, size:2, type:gl.FLOAT, normalized:false, stride:0, offset:0};
@@ -494,8 +539,9 @@ function create_mesh_sphere(gl, SPHERE_DIV)
 
 function shooting(body){
 	var index;
-	for(index = 0; index<10; index++){
+	for(index in bullet_flag){
 		if(bullet_flag[index] == 1){
+			console.log("shoot");
 			bullet_flag[index] = 2; // 2는 동작하는 중
 			break;
 		}
